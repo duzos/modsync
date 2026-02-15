@@ -48,7 +48,9 @@ jobs:
           sed -i "s/mod_version=.*/mod_version=${{ steps.next_version.outputs.version }}/" gradle.properties
 
       - name: Build
-        run: ./gradlew build
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build
 
       - name: Commit version bump
         run: |
