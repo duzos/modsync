@@ -9,7 +9,10 @@ import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
@@ -35,11 +38,18 @@ public class ModDownloader {
      * Fetches the mod list from the server's HTTP endpoint.
      */
     public static List<RemoteModInfo> fetchModList(String serverHost, int httpPort) throws Exception {
+        return fetchModList(serverHost, httpPort, 10000); // Default 10s timeout
+    }
+
+    /**
+     * Fetches the mod list with a custom timeout (for port discovery).
+     */
+    public static List<RemoteModInfo> fetchModList(String serverHost, int httpPort, int timeoutMs) throws Exception {
         String url = "http://" + serverHost + ":" + httpPort + "/modsync/modlist";
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod("GET");
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(15000);
+        conn.setConnectTimeout(timeoutMs);
+        conn.setReadTimeout(timeoutMs);
 
         try (InputStream is = conn.getInputStream()) {
             String json = new String(is.readAllBytes());
@@ -70,15 +80,14 @@ public class ModDownloader {
             ModSync.LOGGER.error("Failed to scan local mods", e);
         }
 
-        // Also check by filename existence as a fallback
+        // Check which mods we're missing or have wrong versions of
         List<RemoteModInfo> missing = new ArrayList<>();
         for (RemoteModInfo remote : serverMods) {
-            Path localFile = modsDir.resolve(remote.fileName);
             boolean hashMatch = localHashes.contains(remote.sha256);
-            boolean fileExists = Files.exists(localFile);
 
-            // If we have the exact same hash somewhere, the mod is present
-            if (!hashMatch && !fileExists) {
+            // If we don't have this exact hash, we need to download it
+            // This handles: new mods, updated mods (different hash), and renamed mods
+            if (!hashMatch) {
                 missing.add(remote);
             }
         }
@@ -95,10 +104,18 @@ public class ModDownloader {
         RemoteModInfo mod,
         BiConsumer<Long, Long> progressCallback
     ) throws Exception {
-        String url = "http://" + serverHost + ":" + httpPort
-            + "/modsync/download?file=" + mod.fileName;
+        // Build URL with properly encoded filename
+        String encodedFileName = URLEncoder.encode(mod.fileName, StandardCharsets.UTF_8)
+            .replace("+", "%20"); // URLEncoder encodes space as +, but we want %20 for URLs
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        String urlStr = "http://" + serverHost + ":" + httpPort
+            + "/modsync/download?file=" + encodedFileName;
+
+        ModSync.LOGGER.info("ModSync: Download URL: {}", urlStr);
+
+        URL url = new URI(urlStr).toURL();
+
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(10000);
         conn.setReadTimeout(60000);

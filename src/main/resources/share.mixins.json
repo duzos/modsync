@@ -8,7 +8,8 @@
   ],
   "client": [
     "ConnectScreenMixin",
-    "DisconnectedScreenMixin",
+    "ModMismatchScreenMixin",
+    "VanillaDisconnectedScreenMixin",
     "TitleScreenMixin"
   ],
   "injectors": {

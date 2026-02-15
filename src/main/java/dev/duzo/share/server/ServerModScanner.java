@@ -29,6 +29,7 @@ public class ServerModScanner {
         }
     }
 
+    // Key is fileName (not modId) to ensure each JAR file is tracked exactly once
     private static final Map<String, ModInfo> MODS = new LinkedHashMap<>();
     private static String cachedModListJson = "{}";
 
@@ -41,10 +42,7 @@ public class ServerModScanner {
     }
 
     public static ModInfo getModByFileName(String fileName) {
-        return MODS.values().stream()
-            .filter(m -> m.fileName.equals(fileName))
-            .findFirst()
-            .orElse(null);
+        return MODS.get(fileName);
     }
 
     public static void scan(Path modsDir) {
@@ -65,6 +63,11 @@ public class ServerModScanner {
         // Build cached JSON
         cachedModListJson = buildModListJson();
         ModSync.LOGGER.info("ModSync: Found {} syncable mods", MODS.size());
+
+        // Log all registered filenames for debugging
+        for (ModInfo mod : MODS.values()) {
+            ModSync.LOGGER.info("ModSync: Registered file '{}' (mod: {})", mod.fileName, mod.modId);
+        }
     }
 
     private static void scanJar(Path jarPath) throws Exception {
@@ -73,18 +76,21 @@ public class ServerModScanner {
         // Skip ourselves
         if (fileName.toLowerCase().contains("modsync")) return;
 
+        // Skip if already registered (shouldn't happen, but just in case)
+        if (MODS.containsKey(fileName)) return;
+
         // Compute SHA-256
         byte[] fileBytes = Files.readAllBytes(jarPath);
         String sha256 = sha256Hex(fileBytes);
         long fileSize = fileBytes.length;
 
-        // Extract mod IDs from mods.toml inside the JAR
+        // Extract first mod ID from mods.toml for display purposes
         List<String> modIds = extractModIds(jarPath);
+        String primaryModId = modIds.isEmpty() ? fileName : modIds.get(0);
 
-        for (String modId : modIds) {
-            MODS.put(modId, new ModInfo(modId, fileName, fileSize, sha256, jarPath));
-            ModSync.LOGGER.debug("ModSync: Registered mod '{}' from {}", modId, fileName);
-        }
+        // Register by filename (not modId) to ensure each JAR is tracked exactly once
+        MODS.put(fileName, new ModInfo(primaryModId, fileName, fileSize, sha256, jarPath));
+        ModSync.LOGGER.debug("ModSync: Registered '{}' (primary mod: {})", fileName, primaryModId);
     }
 
     private static List<String> extractModIds(Path jarPath) throws Exception {
@@ -122,12 +128,8 @@ public class ServerModScanner {
         JsonObject root = new JsonObject();
         JsonArray modsArray = new JsonArray();
 
-        // Track unique filenames to avoid duplicate entries
-        Set<String> seenFiles = new HashSet<>();
-
+        // MODS is already keyed by filename, so no duplicates
         for (ModInfo mod : MODS.values()) {
-            if (seenFiles.contains(mod.fileName)) continue;
-            seenFiles.add(mod.fileName);
 
             JsonObject obj = new JsonObject();
             obj.addProperty("modId", mod.modId);

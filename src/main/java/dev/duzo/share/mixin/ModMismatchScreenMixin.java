@@ -4,6 +4,7 @@ import dev.duzo.share.client.LastServerCache;
 import dev.duzo.share.client.screen.ModSyncScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.client.gui.ModMismatchDisconnectedScreen;
@@ -15,17 +16,34 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Mixin for Forge's ModMismatchDisconnectedScreen.
+ * This screen is shown when Forge detects mod/channel mismatches.
+ * Adds a "Sync Mods from Server" button next to the existing back button.
+ */
 @Mixin(ModMismatchDisconnectedScreen.class)
-public abstract class DisconnectedScreenMixin extends Screen {
+public abstract class ModMismatchScreenMixin extends Screen {
 
     @Shadow @Final private Component reason;
 
-    protected DisconnectedScreenMixin(Component title) {
+    protected ModMismatchScreenMixin(Component title) {
         super(title);
     }
 
     @Inject(method = "init", at = @At("TAIL"))
     private void modsync$addSyncButton(CallbackInfo ci) {
+        // Find and reposition the existing "Back to Server List" button to the left
+        for (Renderable renderable : this.renderables) {
+            if (renderable instanceof Button button) {
+                // Check if this is the back button (at the bottom of the screen)
+                if (button.getY() >= height - 40) {
+                    // Move it to the left side
+                    button.setX(width / 2 - 154);
+                    button.setWidth(150);
+                }
+            }
+        }
+
         // Check if this disconnect looks like a Forge mod mismatch
         String reasonStr = reason.getString().toLowerCase();
         boolean looksLikeModMismatch =
@@ -36,14 +54,13 @@ public abstract class DisconnectedScreenMixin extends Screen {
 
         // Always add the button, but make it more prominent for mod mismatches
         String buttonText = looksLikeModMismatch
-            ? "§aSync Mods"
-            : "Sync Mods";
+            ? "§aSync Mods from Server"
+            : "Sync Mods from Server";
 
-        // Position: right side of the bottom row, next to the back button
-        // Standard button width is 150, with 4px gap between buttons
-        int buttonWidth = 98;
-        int buttonY = height - 28; // Same Y as the back button
-        int rightButtonX = width / 2 + 2; // Right side with small gap from center
+        // Position: right side, next to the back button
+        int buttonWidth = 150;
+        int buttonY = height - 28;
+        int rightButtonX = width / 2 + 4;
 
         addRenderableWidget(Button.builder(
             Component.literal(buttonText),

@@ -57,11 +57,16 @@ public class ModHttpServer {
     }
 
     private void handleDownload(HttpExchange exchange) throws IOException {
+        ModSync.LOGGER.info("ModSync: Received download request: {}", exchange.getRequestURI().toString());
+
         if (!checkAuth(exchange)) return;
 
         // Parse query parameter: ?file=<filename>
         Map<String, String> params = parseQuery(exchange.getRequestURI().getQuery());
         String fileName = params.get("file");
+
+        ModSync.LOGGER.debug("ModSync: Download request for raw query: {}", exchange.getRequestURI().getQuery());
+        ModSync.LOGGER.debug("ModSync: Download request for decoded filename: {}", fileName);
 
         if (fileName == null || fileName.isEmpty()) {
             sendJsonResponse(exchange, 400, "{\"error\":\"Missing 'file' parameter\"}");
@@ -73,7 +78,13 @@ public class ModHttpServer {
 
         ServerModScanner.ModInfo mod = ServerModScanner.getModByFileName(fileName);
         if (mod == null) {
-            sendJsonResponse(exchange, 404, "{\"error\":\"Mod not found\"}");
+            ModSync.LOGGER.warn("ModSync: 404 - Mod not found: '{}'. Available mods: {}",
+                fileName,
+                ServerModScanner.getMods().values().stream()
+                    .map(m -> m.fileName)
+                    .limit(5)
+                    .toList());
+            sendJsonResponse(exchange, 404, "{\"error\":\"Mod not found: " + fileName + "\"}");
             return;
         }
 
@@ -119,10 +130,12 @@ public class ModHttpServer {
         for (String param : query.split("&")) {
             String[] kv = param.split("=", 2);
             if (kv.length == 2) {
-                params.put(
-                    URLDecoder.decode(kv[0], StandardCharsets.UTF_8),
-                    URLDecoder.decode(kv[1], StandardCharsets.UTF_8)
-                );
+                String key = URLDecoder.decode(kv[0], StandardCharsets.UTF_8);
+                // URLDecoder treats + as space (form encoding), but we want literal +
+                // Replace + with %2B before decoding so they stay as + characters
+                String rawValue = kv[1].replace("+", "%2B");
+                String value = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+                params.put(key, value);
             }
         }
         return params;

@@ -1,0 +1,78 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Get current version
+        id: get_version
+        run: |
+          CURRENT_VERSION=$(grep "mod_version=" gradle.properties | cut -d'=' -f2)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate next version
+        id: next_version
+        run: |
+          CURRENT="${{ steps.get_version.outputs.current_version }}"
+          # Split version into parts
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          # Increment patch version
+          PATCH=$((PATCH + 1))
+          NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update version in gradle.properties
+        run: |
+          sed -i "s/mod_version=.*/mod_version=${{ steps.next_version.outputs.version }}/" gradle.properties
+
+      - name: Build
+        run: ./gradlew build
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add gradle.properties
+          git commit -m "Bump version to ${{ steps.next_version.outputs.version }} [skip ci]"
+          git push
+
+      - name: Get JAR file
+        id: get_jar
+        run: |
+          JAR_FILE=$(find build/libs -name "*.jar" ! -name "*-sources.jar" | head -1)
+          JAR_NAME=$(basename $JAR_FILE)
+          echo "jar_path=$JAR_FILE" >> $GITHUB_OUTPUT
+          echo "jar_name=$JAR_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.next_version.outputs.version }}
+          name: Release v${{ steps.next_version.outputs.version }}
+          files: ${{ steps.get_jar.outputs.jar_path }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
