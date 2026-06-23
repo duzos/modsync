@@ -16,26 +16,26 @@
 
 ## What is it?
 
-A Minecraft Forge mod that lets clients **automatically download the mods a server is missing** — so joining a modded server is one click instead of a manual mod hunt. Think "gmod addon share", but for Minecraft.
+A Minecraft Forge mod that lets clients **automatically download the mods a server is missing** - so joining a modded server is one click instead of a manual mod hunt. Think "gmod addon share", but for Minecraft.
 
 ## Features
 
-- 🔄 **Automatic mod detection** — a "Sync Mods" button appears on the mod-mismatch disconnect screen.
-- 🔒 **SHA-256 verification** — downloaded mods are checked against the server's checksums.
-- 🔁 **Auto-reconnect** — rejoins the server after the restart.
-- 🌐 **IPv4 & IPv6** — works with all server address formats.
-- ✅ **User consent** — always asks before downloading anything.
+- 🔄 **Automatic mod detection** - a "Sync Mods" button appears on the mod-mismatch disconnect screen.
+- 🔒 **SHA-256 verification** - downloaded mods are checked against the server's checksums.
+- 🔁 **Auto-reconnect** - rejoins the server after the restart.
+- 🌐 **IPv4 & IPv6** - works with all server address formats.
+- ✅ **User consent** - always asks before downloading anything.
 
 ## How it works
 
-**Server side** — running the mod starts a small HTTP server (default port **25566**, configurable) that serves the installed mod list with SHA-256 checksums and lets clients download the JARs.
+**Server side** - running the mod starts a small HTTP server (default port **25566**, configurable) that serves the installed mod list with SHA-256 checksums and lets clients download the JARs.
 
 **Client side**
 1. Try to connect to a modded server.
 2. If you're kicked for a mod mismatch, click **Sync Mods**.
 3. Review the missing mods and confirm the download.
 4. Mods drop into your `mods` folder.
-5. Click **Restart Now** — the game reconnects automatically.
+5. Click **Restart Now** - the game reconnects automatically.
 
 > **Required on both the server and the client.**
 
@@ -55,7 +55,7 @@ autoRestart = false   # restart automatically after download
 
 ## ⚠️ Security
 
-**Only sync mods from servers you trust.** Mods have full access to your computer — ModSync verifies file integrity, but it can't vouch for what a mod actually does.
+**Only sync mods from servers you trust.** Mods have full access to your computer - ModSync verifies file integrity, but it can't vouch for what a mod actually does.
 
 ## Requirements
 
